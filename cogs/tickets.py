@@ -20,12 +20,6 @@ SUPPORT_CATEGORY  = "Support Tickets"
 # ─── Remind cooldown (seconds) ───────────────────────────────────────────────
 REMIND_COOLDOWN = 3600  # 1 hour
 
-# ─── Colours ─────────────────────────────────────────────────────────────────
-COLOUR_PURCHASE = discord.Colour.from_str("#5865F2")
-COLOUR_SUPPORT  = discord.Colour.from_str("#57F287")
-COLOUR_CLOSE    = discord.Colour.from_str("#ED4245")
-COLOUR_INFO     = discord.Colour.from_str("#FEE75C")
-
 # ─── Remind cooldown store ───────────────────────────────────────────────────
 _remind_cooldowns: dict[int, float] = {}   # channel_id -> last_used unix timestamp
 
@@ -54,25 +48,21 @@ async def cleanup_empty_categories(guild: discord.Guild):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def build_panel_view() -> ui.LayoutView:
-    """Ticket panel using Components V2."""
     view = ui.LayoutView()
 
     container = ui.Container(
-        ui.TextDisplay("# 🎫 FTSL Support & Purchase"),
+        ui.TextDisplay("## FTSL Ticket System"),
         ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         ui.TextDisplay(
-            "Welcome! Please select the type of ticket you'd like to open below.\n\n"
-            "**📦 Purchase** — Want to buy something from us? Select this option and fill in the quick form.\n"
-            "**🛠️ Support** — Having an issue or need help? Select this and describe your problem.\n\n"
-            "A member of our team will be with you shortly. Please be patient and provide as much detail as possible."
+            "Need help or looking to make a purchase? Open a ticket below and someone from our team will be with you shortly.\n\n"
+            "**Purchase** — Select this if you're interested in buying something from us. You'll be asked to fill out a short form with the details.\n\n"
+            "**Support** — Select this if you're running into an issue or need assistance with something. Describe your situation and we'll get back to you as soon as possible."
         ),
         ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
-        ui.TextDisplay("-# 👑 FTSL Bot — Ticket System"),
-        accent_color=COLOUR_INFO,
+        ui.TextDisplay("-# FTSL Bot — Ticket System"),
     )
     view.add_item(container)
 
-    # Dropdown in its own ActionRow below the container
     row = ui.ActionRow(TicketTypeSelect())
     view.add_item(row)
 
@@ -147,7 +137,7 @@ async def open_ticket(
     guild  = interaction.guild
     member = interaction.user
 
-    cat_name = PURCHASE_CATEGORY if ticket_type == "purchase" else SUPPORT_CATEGORY
+    cat_name     = PURCHASE_CATEGORY if ticket_type == "purchase" else SUPPORT_CATEGORY
     channel_name = f"{ticket_type}-{member.name.lower()}"
 
     # ── Duplicate check ──────────────────────────────────────────────────────
@@ -193,46 +183,44 @@ async def open_ticket(
     if support_role:
         await channel.send(support_role.mention)
 
-    # ── Build ticket message (Components V2) ─────────────────────────────────
+    # ── Build ticket message ─────────────────────────────────────────────────
     if ticket_type == "purchase":
-        accent   = COLOUR_PURCHASE
-        header   = f"## 📦 Purchase Ticket — {member.display_name}"
-        intro    = (
-            "Thank you for your interest in purchasing from FTSL!\n"
-            "Support will be with you shortly. Please review your request details below."
+        header  = f"## Purchase Ticket — {member.display_name}"
+        intro   = (
+            "Thanks for reaching out. Someone from our team will be with you shortly.\n"
+            "Here's a summary of what you submitted:"
         )
-        details  = (
-            "**📋 Purchase Details**\n"
+        details = (
+            "**Purchase Details**\n"
             f"```\nItem / Service : {extra['what']}\n"
             f"Payment Method : {extra['payment']}\n```"
         )
     else:
-        accent   = COLOUR_SUPPORT
-        header   = f"## 🛠️ Support Ticket — {member.display_name}"
-        intro    = (
-            "Thanks for reaching out! A support member will be with you shortly.\n"
-            "Please review your submitted details below."
+        header  = f"## Support Ticket — {member.display_name}"
+        intro   = (
+            "Thanks for opening a ticket. A support member will be with you as soon as possible.\n"
+            "Here's a summary of what you submitted:"
         )
-        details  = (
-            "**📋 Issue Details**\n"
+        details = (
+            "**Issue Details**\n"
             f"```\nIssue       : {extra['issue']}\n"
             f"Help Needed : {extra['help_needed']}\n```"
         )
 
     remind_btn = ui.Button(
-        label="🔔 Remind Support",
+        label="Remind Support",
         style=discord.ButtonStyle.secondary,
         custom_id=f"remind_support:{channel.id}",
     )
     close_btn = ui.Button(
-        label="🔒 Request Close",
+        label="Request Close",
         style=discord.ButtonStyle.danger,
         custom_id=f"request_close:{member.id}",
     )
     btn_row = ui.ActionRow(remind_btn, close_btn)
 
     view = ui.LayoutView()
-    container = ui.Container(
+    view.add_item(ui.Container(
         ui.TextDisplay(header),
         ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         ui.TextDisplay(intro),
@@ -241,32 +229,29 @@ async def open_ticket(
         ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         ui.TextDisplay(
             f"**Opened by:** {member.mention}\n"
-            "-# 👑 FTSL Bot — Ticket System"
+            "-# FTSL Bot — Ticket System"
         ),
-        accent_color=accent,
-    )
-    view.add_item(container)
+    ))
     view.add_item(btn_row)
 
     await channel.send(view=view)
 
-    # Register channel for remind cooldown (0 = never used)
     _remind_cooldowns[channel.id] = 0
 
     await interaction.followup.send(
-        f"✅ Your ticket has been opened: {channel.mention}",
+        f"Your ticket has been opened: {channel.mention}",
         ephemeral=True,
     )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  UI Components (Select + standalone buttons used in ActionRows)
+#  Select menu
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TicketTypeSelect(ui.Select):
     def __init__(self):
         super().__init__(
-            placeholder="Select ticket type…",
+            placeholder="Open a ticket...",
             min_values=1,
             max_values=1,
             options=[
@@ -274,13 +259,11 @@ class TicketTypeSelect(ui.Select):
                     label="Purchase",
                     value="purchase",
                     description="Open a ticket to buy something from FTSL.",
-                    emoji="📦",
                 ),
                 discord.SelectOption(
                     label="Support",
                     value="support",
                     description="Open a ticket for help or an issue.",
-                    emoji="🛠️",
                 ),
             ],
             custom_id="ticket_type_select",
@@ -294,21 +277,17 @@ class TicketTypeSelect(ui.Select):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Persistent panel view (keeps the select alive after restarts)
+#  Persistent panel view
 # ══════════════════════════════════════════════════════════════════════════════
 
 class PersistentPanelView(ui.LayoutView):
     def __init__(self):
         super().__init__(timeout=None)
-        row = ui.ActionRow(TicketTypeSelect())
-        # We need a container placeholder so the layout is valid on re-register.
-        # The actual panel message already has the container; this view is only
-        # used to keep the select's custom_id registered.
-        self.add_item(row)
+        self.add_item(ui.ActionRow(TicketTypeSelect()))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Cog — routes all dynamic button interactions via on_interaction
+#  Cog
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TicketsCog(commands.Cog):
@@ -316,7 +295,6 @@ class TicketsCog(commands.Cog):
         self.bot = bot
         self.bot.add_view(PersistentPanelView())
 
-    # ── Dynamic button router ────────────────────────────────────────────────
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
         if interaction.type != discord.InteractionType.component:
@@ -331,11 +309,11 @@ class TicketsCog(commands.Cog):
             last = _remind_cooldowns.get(channel_id, 0)
 
             if last != 0 and (now - last) < REMIND_COOLDOWN:
-                remaining = int(REMIND_COOLDOWN - (now - last))
-                hrs, rem  = divmod(remaining, 3600)
+                remaining  = int(REMIND_COOLDOWN - (now - last))
+                hrs, rem   = divmod(remaining, 3600)
                 mins, secs = divmod(rem, 60)
                 await interaction.response.send_message(
-                    f"⏳ You can remind support again in **{hrs}h {mins}m {secs}s**.",
+                    f"You can remind support again in **{hrs}h {mins}m {secs}s**.",
                     ephemeral=True,
                 )
                 return
@@ -347,11 +325,9 @@ class TicketsCog(commands.Cog):
             view = ui.LayoutView()
             view.add_item(ui.Container(
                 ui.TextDisplay(
-                    f"## 🔔 Support Reminder\n"
-                    f"{mention} — {interaction.user.mention} is still waiting for assistance.\n"
-                    f"Please respond as soon as possible!"
+                    f"## Support Reminder\n"
+                    f"{mention} — {interaction.user.mention} is still waiting for a response in this ticket."
                 ),
-                accent_color=COLOUR_INFO,
             ))
             await interaction.response.send_message(view=view)
 
@@ -361,24 +337,22 @@ class TicketsCog(commands.Cog):
             mention = founder_role.mention if founder_role else "@Founder"
 
             confirm_btn = ui.Button(
-                label="✅ Confirm Close",
+                label="Close Ticket",
                 style=discord.ButtonStyle.danger,
                 custom_id="confirm_close",
             )
-            btn_row = ui.ActionRow(confirm_btn)
 
             view = ui.LayoutView()
             view.add_item(ui.Container(
                 ui.TextDisplay(
-                    f"## 🔒 Close Request\n"
+                    f"## Close Request\n"
                     f"{interaction.user.mention} has requested this ticket be closed.\n\n"
-                    f"{mention} — would you like to close this ticket?"
+                    f"{mention}, would you like to go ahead and close it?"
                 ),
                 ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
                 ui.TextDisplay("-# Only the Founder role can confirm closure."),
-                accent_color=COLOUR_CLOSE,
             ))
-            view.add_item(btn_row)
+            view.add_item(ui.ActionRow(confirm_btn))
             await interaction.response.send_message(view=view)
 
         # ── Confirm Close ────────────────────────────────────────────────────
@@ -386,7 +360,7 @@ class TicketsCog(commands.Cog):
             founder_role = interaction.guild.get_role(FOUNDER_ROLE_ID)
             if founder_role not in interaction.user.roles:
                 await interaction.response.send_message(
-                    "❌ Only members with the **Founder** role can close tickets.",
+                    "Only members with the Founder role can close tickets.",
                     ephemeral=True,
                 )
                 return
@@ -395,10 +369,9 @@ class TicketsCog(commands.Cog):
             view = ui.LayoutView()
             view.add_item(ui.Container(
                 ui.TextDisplay(
-                    f"## 🔒 Ticket Closed\n"
-                    f"Closed by {interaction.user.mention}. Deleting in **5 seconds**…"
+                    f"## Ticket Closed\n"
+                    f"Closed by {interaction.user.mention}. This channel will be deleted in 5 seconds."
                 ),
-                accent_color=COLOUR_CLOSE,
             ))
             await interaction.response.send_message(view=view)
             await asyncio.sleep(5)
@@ -410,9 +383,8 @@ class TicketsCog(commands.Cog):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def ticketpanel(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        view = build_panel_view()
-        await interaction.channel.send(view=view)
-        await interaction.followup.send("✅ Ticket panel sent.", ephemeral=True)
+        await interaction.channel.send(view=build_panel_view())
+        await interaction.followup.send("Ticket panel sent.", ephemeral=True)
 
     # ── /closeticket ─────────────────────────────────────────────────────────
     @app_commands.command(name="closeticket", description="Immediately close this ticket (Founder only).")
@@ -420,7 +392,7 @@ class TicketsCog(commands.Cog):
         founder_role = interaction.guild.get_role(FOUNDER_ROLE_ID)
         if founder_role not in interaction.user.roles:
             await interaction.response.send_message(
-                "❌ Only the **Founder** role can use this command.",
+                "Only the Founder role can use this command.",
                 ephemeral=True,
             )
             return
@@ -428,10 +400,9 @@ class TicketsCog(commands.Cog):
         view = ui.LayoutView()
         view.add_item(ui.Container(
             ui.TextDisplay(
-                f"## 🔒 Ticket Closed\n"
-                f"Closed by {interaction.user.mention}. Deleting in **5 seconds**…"
+                f"## Ticket Closed\n"
+                f"Closed by {interaction.user.mention}. Deleting in 5 seconds."
             ),
-            accent_color=COLOUR_CLOSE,
         ))
         await interaction.response.send_message(view=view)
         await asyncio.sleep(5)
