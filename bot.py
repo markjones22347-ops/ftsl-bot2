@@ -13,7 +13,7 @@ if not TOKEN:
     print("[FATAL] DISCORD_TOKEN environment variable is not set. Add it in Render → Environment.", flush=True)
     sys.exit(1)
 
-keep_alive()  # Start the HTTP ping server before the bot connects
+keep_alive()
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -21,6 +21,12 @@ intents.members = True
 intents.guilds = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+COGS = [
+    "cogs.tickets",
+    "cogs.moderation",
+    "cogs.utility",
+]
 
 
 @bot.event
@@ -35,7 +41,12 @@ async def on_ready():
 
 async def main():
     async with bot:
-        await bot.load_extension("cogs.tickets")
+        for cog in COGS:
+            try:
+                await bot.load_extension(cog)
+                print(f"[FTSL Bot] Loaded {cog}", flush=True)
+            except Exception as e:
+                print(f"[FTSL Bot] Failed to load {cog}: {e}", flush=True)
         await bot.start(TOKEN)
 
 
